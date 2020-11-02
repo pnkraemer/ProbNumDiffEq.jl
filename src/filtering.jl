@@ -47,23 +47,19 @@ end
 
 Use this to test any "advanced" implementation against
 """
-function update(x_pred::Gaussian, h::AbstractVector, H::AbstractMatrix, R::AbstractMatrix)
+function update(x_pred::Gaussian, measurement::Gaussian, H::AbstractMatrix, R::AbstractMatrix)
     m_p, P_p = x_pred.μ, x_pred.Σ
+    z, S = measurement.μ, measurement.Σ
 
-    v = 0 .- h
-    S = Symmetric(H * P_p * H' .+ R)
     S_inv = inv(S)
     K = P_p * H' * S_inv
 
-    filt_mean = m_p .+ P_p * H' * (S\v)
-    filt_cov = X_A_Xt(PDMat(Symmetric(P_p)), (I-K*H))
-    if !iszero(R)
-        filt_cov .+= Symmetric(X_A_Xt(PDMat(R), K))
-    end
+    m = m_p .+ K * (0 .- z)
 
-    assert_nonnegative_diagonal(filt_cov)
+    P = X_A_Xt(P_p, (I-K*H)) # + X_A_Xt(R, K)
+    @assert iszero(R)
 
-    return Gaussian(filt_mean, filt_cov)
+    return Gaussian(m, P)
 end
 
 
