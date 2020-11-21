@@ -108,6 +108,6 @@ function OrdinaryDiffEq.alg_cache(
         measurement,
         H, du, ddu, K, initdiff,
         copy(u0),
-        0
+        zero(uEltypeNoUnits)
     )
 end
