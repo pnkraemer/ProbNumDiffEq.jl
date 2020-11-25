@@ -25,11 +25,13 @@ mutable struct GaussianODEFilterCache{
     x_pred::xType
     x_filt::xType
     x_tmp::xType
+    x_tmp2::xType
     measurement
     H::matType
     du::uType
     ddu::matType
     K::matType
+    G::matType
     diffmat::diffusionType
     err_tmp::uType
     log_likelihood
@@ -84,6 +86,7 @@ function OrdinaryDiffEq.alg_cache(
     v, S = copy(h), copy(ddu)
     measurement = Gaussian(v, S)
     K = copy(H')
+    G = copy(Matrix(P0))
 
     diffusion_models = Dict(
         :dynamic => DynamicDiffusion(),
@@ -104,9 +107,9 @@ function OrdinaryDiffEq.alg_cache(
         d, q, A, Q, diffmodel, R, Proj, SolProj, Precond, InvPrecond,
         # Mutable stuff
         copy(u0), copy(u0), copy(u0), copy(u0),
-        copy(x0), copy(x0), copy(x0), copy(x0),
+        copy(x0), copy(x0), copy(x0), copy(x0), copy(x0),
         measurement,
-        H, du, ddu, K, initdiff,
+        H, du, ddu, K, G, initdiff,
         copy(u0),
         zero(uEltypeNoUnits)
     )
