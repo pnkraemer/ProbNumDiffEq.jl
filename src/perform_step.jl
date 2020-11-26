@@ -149,13 +149,18 @@ end
 function estimate_errors(integ, cache::GaussianODEFilterCache)
     @unpack dt = integ
     @unpack InvPrecond = integ.cache
-    @unpack diffmat, Q, H = integ.cache
+    @unpack diffmat, Q, H, tmp = integ.cache
+    error_estimate = tmp
 
     if diffmat isa Real && isinf(diffmat)
         return Inf
     end
 
-    error_estimate = sqrt.(diag(X_A_Xt(apply_diffusion(Q*dt, diffmat), H)))
+    # Only split up to evaluate allocations
+    _A = apply_diffusion(Q*dt, diffmat)
+    _B = X_A_Xt(_A, H)
+    _C = diag(_B)
+    error_estimate .= sqrt.(_C)
 
     return error_estimate
 end
