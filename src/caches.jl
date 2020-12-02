@@ -3,13 +3,14 @@
 ########################################################################################
 abstract type ODEFiltersCache <: OrdinaryDiffEq.OrdinaryDiffEqCache end
 mutable struct GaussianODEFilterCache{
-    RType, ProjType, SolProjType, F1, F2, uType, xType, matType, PSDMatType, diffusionType, diffModelType,
+    RType, ProjType, SolProjType, F1, F2, uType, xType, AType, QType, matType, diffusionType, diffModelType,
+    measType, llType,
 } <: ODEFiltersCache
     # Constants
     d::Int                  # Dimension of the problem
     q::Int                  # Order of the prior
-    A::matType
-    Q::PSDMatType
+    A::AType
+    Q::QType
     diffusionmodel::diffModelType
     R::RType
     Proj::ProjType
@@ -26,15 +27,16 @@ mutable struct GaussianODEFilterCache{
     x_filt::xType
     x_tmp::xType
     x_tmp2::xType
-    measurement
+    measurement::measType
     H::matType
     du::uType
     ddu::matType
     K::matType
     G::matType
+    covmatcache::matType
     diffmat::diffusionType
     err_tmp::uType
-    log_likelihood
+    log_likelihood::llType
 end
 
 function OrdinaryDiffEq.alg_cache(
@@ -87,6 +89,7 @@ function OrdinaryDiffEq.alg_cache(
     measurement = Gaussian(v, S)
     K = copy(H')
     G = copy(Matrix(P0))
+    covmatcache = copy(G)
 
     diffusion_models = Dict(
         :dynamic => DynamicDiffusion(),
@@ -100,8 +103,8 @@ function OrdinaryDiffEq.alg_cache(
 
     return GaussianODEFilterCache{
         typeof(R), typeof(Proj), typeof(SolProj), typeof(Precond), typeof(InvPrecond),
-        uType, typeof(x0), matType, typeof(Q), typeof(initdiff),
-        typeof(diffmodel),
+        uType, typeof(x0), typeof(A), typeof(Q), matType, typeof(initdiff),
+        typeof(diffmodel), typeof(measurement), uEltypeNoUnits,
     }(
         # Constants
         d, q, A, Q, diffmodel, R, Proj, SolProj, Precond, InvPrecond,
@@ -109,7 +112,7 @@ function OrdinaryDiffEq.alg_cache(
         copy(u0), copy(u0), copy(u0), copy(u0),
         copy(x0), copy(x0), copy(x0), copy(x0), copy(x0),
         measurement,
-        H, du, ddu, K, G, initdiff,
+        H, du, ddu, K, G, covmatcache, initdiff,
         copy(u0),
         zero(uEltypeNoUnits)
     )
