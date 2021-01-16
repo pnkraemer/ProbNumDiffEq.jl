@@ -3,7 +3,7 @@ function OrdinaryDiffEq.initialize!(integ, cache::GaussianODEFilterCache)
     @assert integ.opts.dense == integ.alg.smooth "`dense` and `smooth` should have the same value! "
     @assert integ.saveiter == 1
     OrdinaryDiffEq.copyat_or_push!(integ.sol.x, integ.saveiter, cache.x)
-    OrdinaryDiffEq.copyat_or_push!(integ.sol.pu, integ.saveiter, cache.SolProj*cache.x)
+    OrdinaryDiffEq.copyat_or_push!(integ.sol.pu, integ.saveiter, cache.SolProj * cache.x)
 end
 
 """Perform a step
@@ -32,38 +32,93 @@ function OrdinaryDiffEq.perform_step!(integ, cache::GaussianODEFilterCache, repe
     PI = inv(P)
     x = P * x
 
-    @info P PI
 
-    if isdynamic(cache.diffusionmodel)  # Calibrate, then predict cov
+    ######################################################################
+    # No more dynamic diffusion, because I want to keep it simple for now.
+    ######################################################################
 
-        # Predict
-        predict_mean!(x_pred, x, A, Q)
-        mul!(u_pred, SolProj, PI*x_pred.μ)
+    # if isdynamic(cache.diffusionmodel)  # Calibrate, then predict cov
 
-        # Measure
-        measure!(integ, x_pred, tnew)
+    #     # Predict
+    #     predict_mean!(x_pred, x, A, Q)
+    #     mul!(u_pred, SolProj, PI * x_pred.μ)
 
-        # Estimate diffusion
-        integ.cache.diffusion = estimate_diffusion(cache.diffusionmodel, integ)
-        # Adjust prediction and measurement
-        predict_cov!(x_pred, x, A, apply_diffusion(Q, integ.cache.diffusion))
-        copy!(integ.cache.measurement.Σ, Matrix(X_A_Xt(x_pred.Σ, integ.cache.H)))
+    #     # Measure
+    #     measure!(integ, x_pred, tnew)
 
-    else  # Vanilla filtering order: Predict, measure, calibrate
+    #     # Estimate diffusion
+    #     integ.cache.diffusion = estimate_diffusion(cache.diffusionmodel, integ)
+    #     # Adjust prediction and measurement
+    #     predict_cov!(x_pred, x, A, apply_diffusion(Q, integ.cache.diffusion))
+    #     copy!(integ.cache.measurement.Σ, Matrix(X_A_Xt(x_pred.Σ, integ.cache.H)))
 
-        predict!(x_pred, x, A, Q)
-        mul!(u_pred, SolProj, PI*x_pred.μ)
-        measure!(integ, x_pred, tnew)
-        integ.cache.diffusion = estimate_diffusion(cache.diffusionmodel, integ)
+    # else  # Vanilla filtering order: Predict, measure, calibrate
 
-    end
+    #     predict!(x_pred, x, A, Q)
+    #     mul!(u_pred, SolProj, PI * x_pred.μ)
+    #     measure!(integ, x_pred, tnew)
+    #     integ.cache.diffusion = estimate_diffusion(cache.diffusionmodel, integ)
+    # end
+    ######################################################################
+
+    predict!(x_pred, x, A, Q)
+
+
+    ##########################################################################################
+
+    # From here on...
+
+    E0, E1 = Proj(0), Proj(1)
+
+    x_undone =  PI * x_pred
+
+
+
+    T = 20 # end time step
+    P_bvp = Precond(T - t)
+    PI_bvp = inv(P_bvp)
+    
+
+    x_new = P_bvp * x_undone
+
+    meas_mean = E0 * A * x_new.μ - [4, 4]
+
+    meas_cov = X_A_Xt(x_new.Σ, E0 *  A) + X_A_Xt(Q, E0)
+
+
+    meas_crosscov = x_new.Σ * A' * E0'
+
+    kgain = meas_crosscov * inv(meas_cov)
+
+    μ = x_new.μ + kgain * (meas_mean)
+    Σ = x_new.Σ + kgain * meas_cov * kgain'
+
+
+    μ_undone = PI_bvp * μ
+    Σ_undone = PI_bvp * Σ
+
+    @info μ_undone Σ_undone
+
+    # Back to the old coordinates
+    x_pred = Gaussian(μ_undone, Σ_undone)
+    x_pred = P * x_pred
+
+    ##########################################################################################
+
+
+
+
+    mul!(u_pred, SolProj, PI * x_pred.μ)
+    measure!(integ, x_pred, tnew)
+    integ.cache.diffusion = estimate_diffusion(cache.diffusionmodel, integ)
+
 
     # Likelihood
     cache.log_likelihood = logpdf(cache.measurement, zeros(d))
 
     # Update
     x_filt = update!(integ, x_pred)
-    mul!(u_filt, SolProj, PI*x_filt.μ)
+    mul!(u_filt, SolProj, PI * x_filt.μ)
     integ.u .= u_filt
 
     # Undo the coordinate change / preconditioning
@@ -95,7 +150,7 @@ function h!(integ, x_pred, t)
     z = measurement.μ
     E0, E1 = Proj(0), Proj(1)
 
-    u_pred .= E0*PI*x_pred.μ
+    u_pred .= E0 * PI * x_pred.μ
     IIP = isinplace(integ.f)
     if IIP
         f(du, u_pred, p, t)
@@ -104,7 +159,7 @@ function h!(integ, x_pred, t)
     end
     integ.destats.nf += 1
 
-    z .= E1*PI*x_pred.μ .- du
+    z .= E1 * PI * x_pred.μ .- du
 
     return z
 end
