@@ -32,6 +32,8 @@ function OrdinaryDiffEq.perform_step!(integ, cache::GaussianODEFilterCache, repe
     PI = inv(P)
     x = P * x
 
+    @info P PI
+
     if isdynamic(cache.diffusionmodel)  # Calibrate, then predict cov
 
         # Predict
