@@ -68,53 +68,53 @@ function OrdinaryDiffEq.perform_step!(integ, cache::GaussianODEFilterCache, repe
 
     # From here on...
 
-
-    x_undone =  PI * x_pred
-
-
-
-    T = 20 # end time step
-    P_bvp = Precond(T - t)
-    PI_bvp = inv(P_bvp)
-    E0, E1 = Proj(0) * PI_bvp, Proj(1) * PI_bvp
+    # hotfix for weird behaviour in the end region
+    if t < 19.9
+        x_undone =  PI * x_pred
 
 
-    x_new = P_bvp * x_undone
 
-    meas_mean = E0 * A * x_new.μ - [4, 4]
-
-    meas_cov = X_A_Xt(x_new.Σ, E0 *  A) + X_A_Xt(Q, E0)
-
-
-    meas_crosscov = x_new.Σ * A' * E0'
-
-    kgain = meas_crosscov * inv(meas_cov)
-
-    μ = x_new.μ - kgain * meas_mean
+        T = 20 # end time step
+        P_bvp = Precond(T - t)
+        PI_bvp = inv(P_bvp)
+        E0, E1 = Proj(0) * PI_bvp, Proj(1) * PI_bvp
 
 
-    h1 = X_A_Xt(x_new.Σ, (I - kgain * E0 * A))
-    h2 = X_A_Xt(Q, E0)
-    h3 = X_A_Xt(h2, kgain)
-    # Σ = h1 + h3
+        x_new = P_bvp * x_undone
 
-    _L = [h1.squareroot h3.squareroot]
-    _, R = qr(_L')
-    Σ = SRMatrix(LowerTriangular(collect(R')))
+        meas_mean = E0 * A * x_new.μ - [10, 10]
 
-    #     Σ = x_new.Σ + kgain * meas_cov * kgain'
-
-    μ_undone = PI_bvp * μ
-    Σ_undone = PI_bvp * Σ
+        meas_cov = X_A_Xt(x_new.Σ, E0 * A) + X_A_Xt(Q, E0)
 
 
-    Σ_undone2 = PI_bvp * Σ.squareroot
-    @info μ_undone Σ_undone
+        meas_crosscov = x_new.Σ * A' * E0'
 
-    # Back to the old coordinates
-    x_pred = Gaussian(μ_undone, SRMatrix(Σ_undone2))
-    x_pred = P * x_pred
+        kgain = meas_crosscov * inv(meas_cov)
 
+        μ = x_new.μ - kgain * meas_mean
+
+
+        h1 = X_A_Xt(x_new.Σ, (I - kgain * E0 * A))
+        h2 = X_A_Xt(Q, E0)
+        h3 = X_A_Xt(h2, kgain)
+        # Σ = h1 + h3
+
+        _L = [h1.squareroot h3.squareroot]
+        _, R = qr(_L')
+        Σ = SRMatrix(LowerTriangular(collect(R')))
+
+        #     Σ = x_new.Σ + kgain * meas_cov * kgain'
+
+        μ_undone = PI_bvp * μ
+        Σ_undone = PI_bvp * Σ
+        Σ_undone2 = PI_bvp * Σ.squareroot
+
+        @info t
+        # Back to the old coordinates
+        x_pred = Gaussian(μ_undone, SRMatrix(Σ_undone2))
+
+        x_pred = P * x_pred
+    end
     ##########################################################################################
 
 
@@ -147,6 +147,8 @@ function OrdinaryDiffEq.perform_step!(integ, cache::GaussianODEFilterCache, repe
         integ.EEst = integ.opts.internalnorm(err_tmp, t) # scalar
 
     end
+
+    
     # stuff that would normally be in apply_step!
     if !integ.opts.adaptive || integ.EEst < one(integ.EEst)
         copy!(integ.cache.x, integ.cache.x_filt)
