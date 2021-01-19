@@ -3,7 +3,7 @@
 
 Add a jacobian function to the ODE function, using ModelingToolkit.jl.
 """
-function remake_prob_with_jac(prob::ODEProblem)
+function remake_prob_with_jac(prob::Union{ODEProblem,BVProblem})
     IIP = isinplace(prob.f)
     try
         p = prob.p isa DiffEqBase.NullParameters ? [] : collect(prob.p)

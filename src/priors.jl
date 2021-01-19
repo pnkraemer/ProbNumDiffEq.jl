@@ -9,16 +9,16 @@ function ibm(d::Integer, q::Integer, elType=typeof(1.0))
     I_d = diagm(0 => ones(d))
     F = kron(F̃, I_d)  # In probnum the order is inverted
 
-    A_base = diagm(0=>ones(elType, d*(q+1)))
-    Q_base = zeros(elType, d*(q+1), d*(q+1))
+    A_base = diagm(0 => ones(elType, d * (q + 1)))
+    Q_base = zeros(elType, d * (q + 1), d * (q + 1))
 
     @fastmath function A!(A::AbstractMatrix, h::Real)
         # Assumes that A comes from a previous computation => zeros and one-diag
         val = one(h)
         for i in 1:q
             val = val / i
-            for j in 1:d*(q+1-i)
-                @inbounds A[j,j+(d*i)] = val
+            for j in 1:d * (q + 1 - i)
+                @inbounds A[j,j + (d * i)] = val
             end
         end
     end
@@ -37,9 +37,9 @@ function ibm(d::Integer, q::Integer, elType=typeof(1.0))
         @simd for col in 0:q
             @simd for row in col:q
                 val = _transdiff_ibm_element(row, col, h) * σ²
-                @simd for i in 0:d-1
-                    @inbounds Q[1 + col*d + i,1 + row*d + i] = val
-                    @inbounds Q[1 + row*d + i,1 + col*d + i] = val
+                @simd for i in 0:d - 1
+                    @inbounds Q[1 + col * d + i,1 + row * d + i] = val
+                    @inbounds Q[1 + row * d + i,1 + col * d + i] = val
                 end
             end
         end
@@ -64,8 +64,8 @@ function vanilla_ibm(d::Integer, q::Integer)
         val = one(h)
         for i in 1:q
             val = val * h / i
-            for j in 1:d*(q+1-i)
-                @inbounds A[j,j+(d*i)] = val
+            for j in 1:d * (q + 1 - i)
+                @inbounds A[j,j + (d * i)] = val
             end
         end
     end
@@ -81,9 +81,9 @@ function vanilla_ibm(d::Integer, q::Integer)
         @simd for col in 0:q
             @simd for row in col:q
                 val = _transdiff_ibm_element(row, col, h) * σ²
-                @simd for i in 0:d-1
-                    @inbounds Q[1 + col*d + i,1 + row*d + i] = val
-                    @inbounds Q[1 + row*d + i,1 + col*d + i] = val
+                @simd for i in 0:d - 1
+                    @inbounds Q[1 + col * d + i,1 + row * d + i] = val
+                    @inbounds Q[1 + row * d + i,1 + col * d + i] = val
                 end
             end
         end

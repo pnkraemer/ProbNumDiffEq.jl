@@ -2,10 +2,7 @@
 # Caches
 ########################################################################################
 abstract type ODEFiltersCache <: OrdinaryDiffEq.OrdinaryDiffEqCache end
-mutable struct GaussianODEFilterCache{
-    RType, ProjType, SolProjType, FP, uType, xType, AType, QType, matType, diffusionType, diffModelType,
-    measType, llType,
-} <: ODEFiltersCache
+mutable struct GaussianODEFilterCache{RType,ProjType,SolProjType,FP,uType,xType,AType,QType,matType,diffusionType,diffModelType,measType,llType,} <: ODEFiltersCache
     # Constants
     d::Int                  # Dimension of the problem
     q::Int                  # Order of the prior
@@ -40,7 +37,7 @@ end
 
 function OrdinaryDiffEq.alg_cache(
     alg::GaussianODEFilter, u, rate_prototype, uEltypeNoUnits, uBottomEltypeNoUnits, tTypeNoUnits, uprev, uprev2, f, t, dt, reltol, p, calck, IIP)
-    initialize_derivatives=true
+    initialize_derivatives = true
 
     if !(u isa AbstractVector)
         error("Problems which are not scalar- or vector-valued (e.g. u0 is a scalar or a matrix) are currently not supported")
@@ -60,22 +57,38 @@ function OrdinaryDiffEq.alg_cache(
     matType = Matrix{uElType}
 
     # Projections
-    Proj(deriv) = kron([i==(deriv+1) ? 1 : 0 for i in 1:q+1]', diagm(0 => ones(d)))
+    Proj(deriv) = kron([i == (deriv + 1) ? 1 : 0 for i in 1:q + 1]', diagm(0 => ones(d)))
     SolProj = Proj(0)
 
     # Prior dynamics
     @assert alg.prior == :ibm "Only the ibm prior is implemented so far"
     Precond = preconditioner(d, q)
     A, Q = ibm(d, q, uElType)
+    
+    # @info "Before" Q
+    # Q.squareroot = 10000 * Q.squareroot
 
+    # @info "After" Q
+    # error()
     # Measurement model
     R = zeros(d, d)
     # Initial states
-    m0, P0 = initialize_derivatives ?
-        initialize_with_derivatives(u0, f, p, t0, q) :
-        initialize_without_derivatives(u0, f, p, t0, q)
-    @assert iszero(P0)
-    P0 = SRMatrix(zero(P0))
+    # m0, P0 = initialize_derivatives ?
+    #     initialize_with_derivatives(u0, f, p, t0, q) :
+    #     initialize_without_derivatives(u0, f, p, t0, q)
+    m0, P0 = initialize_without_derivatives(u0, f, p, t0, q)
+
+    m0[2] = 0.
+    P0[2, 2] = 0.001
+
+
+    P0 = 1000 * P0
+
+    @info "Cache" P0
+
+
+    # @assert iszero(P0)
+    P0 = SRMatrix(P0)
     x0 = Gaussian(m0, P0)
 
     # Pre-allocate a bunch of matrices
@@ -99,11 +112,7 @@ function OrdinaryDiffEq.alg_cache(
     diffmodel = diffusion_models[alg.diffusionmodel]
     initdiff = initial_diffusion(diffmodel, d, q, uEltypeNoUnits)
 
-    return GaussianODEFilterCache{
-        typeof(R), typeof(Proj), typeof(SolProj), typeof(Precond),
-        uType, typeof(x0), typeof(A), typeof(Q), matType, typeof(initdiff),
-        typeof(diffmodel), typeof(measurement), uEltypeNoUnits,
-    }(
+    return GaussianODEFilterCache{typeof(R),typeof(Proj),typeof(SolProj),typeof(Precond),uType,typeof(x0),typeof(A),typeof(Q),matType,typeof(initdiff),typeof(diffmodel),typeof(measurement),uEltypeNoUnits,}(
         # Constants
         d, q, A, Q, diffmodel, R, Proj, SolProj, Precond,
         # Mutable stuff

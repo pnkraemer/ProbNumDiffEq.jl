@@ -4,6 +4,7 @@ function OrdinaryDiffEq.initialize!(integ, cache::GaussianODEFilterCache)
     @assert integ.saveiter == 1
     OrdinaryDiffEq.copyat_or_push!(integ.sol.x, integ.saveiter, cache.x)
     OrdinaryDiffEq.copyat_or_push!(integ.sol.pu, integ.saveiter, cache.SolProj * cache.x)
+
 end
 
 """Perform a step
@@ -17,13 +18,15 @@ Basically consists of the following steps
 - Calibration; Adjust prediction / measurement covs if the diffusion model "dynamic"
 - Update step
 - Error estimation
-- Undo the coordinate change / Predonditioning
+- Undo the coordinate change / Preconditioning
 """
 function OrdinaryDiffEq.perform_step!(integ, cache::GaussianODEFilterCache, repeat_step=false)
     @unpack t, dt = integ
     @unpack d, Proj, SolProj, Precond = integ.cache
     @unpack x, x_pred, u_pred, x_filt, u_filt, err_tmp = integ.cache
     @unpack A, Q = integ.cache
+
+
 
     tnew = t + dt
 
@@ -67,22 +70,23 @@ function OrdinaryDiffEq.perform_step!(integ, cache::GaussianODEFilterCache, repe
     ##########################################################################################
 
     # From here on...
+    T = pi / 2 # end time step
 
     # hotfix for weird behaviour in the end region
-    if t < 19.9
+    if tnew < T 
         x_undone =  PI * x_pred
 
 
-
-        T = 20 # end time step
-        P_bvp = Precond(T - t)
+        P_bvp = Precond(T - tnew)
         PI_bvp = inv(P_bvp)
-        E0, E1 = Proj(0) * PI_bvp, Proj(1) * PI_bvp
+        
+        
+        E0 = [1 0] * Proj(0) * PI_bvp
 
 
         x_new = P_bvp * x_undone
 
-        meas_mean = E0 * A * x_new.μ - [10, 10]
+        meas_mean = E0 * A * x_new.μ + [5 * pi / 2]
 
         meas_cov = X_A_Xt(x_new.Σ, E0 * A) + X_A_Xt(Q, E0)
 
@@ -104,32 +108,71 @@ function OrdinaryDiffEq.perform_step!(integ, cache::GaussianODEFilterCache, repe
         Σ = SRMatrix(LowerTriangular(collect(R')))
 
         #     Σ = x_new.Σ + kgain * meas_cov * kgain'
+        
 
         μ_undone = PI_bvp * μ
-        Σ_undone = PI_bvp * Σ
+        # Σ_undone = PI_bvp * Σ
         Σ_undone2 = PI_bvp * Σ.squareroot
 
-        @info t
         # Back to the old coordinates
         x_pred = Gaussian(μ_undone, SRMatrix(Σ_undone2))
 
-        x_pred = P * x_pred
+        x_pred = P * copy(x_pred)
+
+
+    elseif tnew == T 
+        
+        
+        E0 = [1 0] * Proj(0) * PI
+
+
+        x_new = x_pred
+
+        meas_mean = E0 * x_new.μ + [5 * pi / 2]
+
+        meas_cov = X_A_Xt(x_new.Σ, E0)
+
+
+        meas_crosscov = x_new.Σ * E0'
+
+        kgain = meas_crosscov * inv(meas_cov)
+
+        μ = x_new.μ - kgain * meas_mean
+
+
+        h1 = X_A_Xt(x_new.Σ, (I - kgain * E0))
+        # Σ = h1 + h3
+
+        Σ = SRMatrix(h1.squareroot)
+
+        #     Σ = x_new.Σ + kgain * meas_cov * kgain'
+        
+
+        μ_undone =  μ
+        # Σ_undone = PI_bvp * Σ
+        Σ_undone2 = Σ.squareroot
+
+        # Back to the old coordinates
+        x_pred = Gaussian(μ_undone, SRMatrix(Σ_undone2))
+
+
     end
     ##########################################################################################
 
 
-
-
     mul!(u_pred, SolProj, PI * x_pred.μ)
-    measure!(integ, x_pred, tnew)
-    integ.cache.diffusion = estimate_diffusion(cache.diffusionmodel, integ)
+    # measure!(integ, x_pred, tnew)
+    # integ.cache.diffusion = estimate_diffusion(cache.diffusionmodel, integ)
 
 
     # Likelihood
-    cache.log_likelihood = logpdf(cache.measurement, zeros(d))
+    # cache.log_likelihood = logpdf(cache.measurement, zeros(d))
 
     # Update
-    x_filt = update!(integ, x_pred)
+    # x_filt = update!(integ, x_pred)
+    x_filt = copy(x_pred)
+
+
     mul!(u_filt, SolProj, PI * x_filt.μ)
     integ.u .= u_filt
 
@@ -137,7 +180,7 @@ function OrdinaryDiffEq.perform_step!(integ, cache::GaussianODEFilterCache, repe
     copy!(integ.cache.x, PI * x)
     copy!(integ.cache.x_pred, PI * x_pred)
     copy!(integ.cache.x_filt, PI * x_filt)
-
+    
     # Estimate error for adaptive steps
     if integ.opts.adaptive
         err_est_unscaled = estimate_errors(integ, integ.cache)
@@ -186,6 +229,7 @@ function H!(integ, x_pred, t)
 
     if alg isa EK1 || alg isa IEKS
         if alg isa IEKS && !isnothing(alg.linearize_at)
+            @show "happens"
             linearize_at = alg.linearize_at(t).μ
         else
             linearize_at = u_pred
