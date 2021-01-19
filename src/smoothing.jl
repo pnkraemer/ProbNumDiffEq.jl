@@ -7,10 +7,10 @@ function smooth_all!(integ)
     @unpack A, Q, Precond = integ.cache
     # x_pred is just used as a cache here
 
-    for i in length(x)-1:-1:2
-        dt = t[i+1] - t[i]
+    for i in length(x) - 1:-1:1
+        dt = t[i + 1] - t[i]
         if iszero(dt)
-            copy!(x[i], x[i+1])
+            copy!(x[i], x[i + 1])
             continue
         end
 
@@ -20,7 +20,7 @@ function smooth_all!(integ)
         Qh = apply_diffusion(Q, diffusions[i])
 
         x[i] = P * x[i]
-        smooth!(x[i], P*x[i+1], A, Qh, integ)
+        smooth!(x[i], P * x[i + 1], A, Qh, integ)
         any(isnan.(x[i].μ)) && error("NaN mean after smoothing")
         any(isnan.(x[i].Σ)) && error("NaN cov after smoothing")
         x[i] = PI * x[i]
@@ -56,7 +56,7 @@ function smooth!(x_curr, x_next, Ah, Qh, integ)
     #     + X_A_Xt(Qh, K_tilde)
     #     + X_A_Xt(x_next.Σ, G)
     # )
-    _R = [x_curr.Σ.squareroot' * (I - K_tilde*Ah)'
+    _R = [x_curr.Σ.squareroot' * (I - K_tilde * Ah)'
           Qh.squareroot' * K_tilde'
           x_next.Σ.squareroot' * G']
     _, P_s_R = qr(_R)
