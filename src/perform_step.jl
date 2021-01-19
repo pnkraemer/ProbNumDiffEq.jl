@@ -86,7 +86,7 @@ function OrdinaryDiffEq.perform_step!(integ, cache::GaussianODEFilterCache, repe
 
         x_new = P_bvp * x_undone
 
-        meas_mean = E0 * A * x_new.μ + [5 * pi / 2]
+        meas_mean = E0 * A * x_new.μ - [pi / 2]
 
         meas_cov = X_A_Xt(x_new.Σ, E0 * A) + X_A_Xt(Q, E0)
 
@@ -117,6 +117,10 @@ function OrdinaryDiffEq.perform_step!(integ, cache::GaussianODEFilterCache, repe
         # Back to the old coordinates
         x_pred = Gaussian(μ_undone, SRMatrix(Σ_undone2))
 
+
+        P = Precond(dt)
+        PI = inv(P)
+
         x_pred = P * copy(x_pred)
 
 
@@ -128,7 +132,7 @@ function OrdinaryDiffEq.perform_step!(integ, cache::GaussianODEFilterCache, repe
 
         x_new = x_pred
 
-        meas_mean = E0 * x_new.μ + [5 * pi / 2]
+        meas_mean = E0 * x_new.μ - [pi / 2]
 
         meas_cov = X_A_Xt(x_new.Σ, E0)
 
@@ -161,16 +165,16 @@ function OrdinaryDiffEq.perform_step!(integ, cache::GaussianODEFilterCache, repe
 
 
     mul!(u_pred, SolProj, PI * x_pred.μ)
-    # measure!(integ, x_pred, tnew)
-    # integ.cache.diffusion = estimate_diffusion(cache.diffusionmodel, integ)
+    measure!(integ, x_pred, tnew)
+    integ.cache.diffusion = estimate_diffusion(cache.diffusionmodel, integ)
 
 
     # Likelihood
-    # cache.log_likelihood = logpdf(cache.measurement, zeros(d))
+    cache.log_likelihood = logpdf(cache.measurement, zeros(d))
 
     # Update
-    # x_filt = update!(integ, x_pred)
-    x_filt = copy(x_pred)
+    x_filt = update!(integ, x_pred)
+    # x_filt = copy(x_pred)
 
 
     mul!(u_filt, SolProj, PI * x_filt.μ)
