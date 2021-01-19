@@ -1,5 +1,55 @@
 # Called in the OrdinaryDiffEQ.__init; All `OrdinaryDiffEqAlgorithm`s have one
 function OrdinaryDiffEq.initialize!(integ, cache::GaussianODEFilterCache)
+
+    @unpack t, dt, f = integ
+    @unpack d, Proj, SolProj, Precond, du = integ.cache
+    @unpack x, x_pred, u_pred, x_filt, u_filt, err_tmp = integ.cache
+    @unpack A, Q = integ.cache
+
+
+    @unpack f, p, dt, alg = integ
+    @unpack ddu, Proj, Precond, H, u_pred = integ.cache
+
+    # μ = x.μ
+    # Σ = x.Σ
+    # H = [1 0] * Proj(0)
+    # S = H * Σ * H' 
+    # K = Σ * H' * inv(S)
+
+    # μ_new = μ + K * (- π / 2 .- H * μ)
+    # Σ_new = X_A_Xt(Σ, I - K * H)
+    
+    integ.cache.x.μ[1] = - π / 2
+    integ.cache.x.Σ.squareroot[1, 1] = 0.0
+    @info  "" integ.cache.x.μ
+    # f(du, Proj(0) * μ_new, p, t)
+    # f.jac(ddu, Proj(0) * μ_new, p, t)
+
+    # z = Proj(1) * μ_new - du
+    # H = Proj(1) - ddu * Proj(0)
+
+    # S = H * Σ_new * H' 
+    # K = Σ_new * H' * inv(S)
+
+    # μ_new2 = μ_new - K * z
+    # Σ_new2 = X_A_Xt(Σ_new, I - K * H)
+
+    # @info "" μ_new μ_new2 Σ_new Σ_new2
+    # copy!(x, Gaussian(μ_new, Σ_new))
+
+    # @info " " μ_new Σ_new
+
+
+
+
+
+
+
+    # measure!(integ, integ.cache.x, integ.t)
+
+    # x_filt = update!(integ, integ.cache.x)
+    # copy!(integ.cache.x, x_filt)
+
     @assert integ.opts.dense == integ.alg.smooth "`dense` and `smooth` should have the same value! "
     @assert integ.saveiter == 1
     OrdinaryDiffEq.copyat_or_push!(integ.sol.x, integ.saveiter, cache.x)
@@ -126,7 +176,9 @@ function OrdinaryDiffEq.perform_step!(integ, cache::GaussianODEFilterCache, repe
 
     elseif tnew == T 
         
-        
+        P = Precond(dt)
+        PI = inv(P)
+
         E0 = [1 0] * Proj(0) * PI
 
 
@@ -162,6 +214,8 @@ function OrdinaryDiffEq.perform_step!(integ, cache::GaussianODEFilterCache, repe
 
     end
     ##########################################################################################
+    P = Precond(dt)
+    PI = inv(P)
 
 
     mul!(u_pred, SolProj, PI * x_pred.μ)

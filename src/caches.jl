@@ -73,22 +73,25 @@ function OrdinaryDiffEq.alg_cache(
     # Measurement model
     R = zeros(d, d)
     # Initial states
-    # m0, P0 = initialize_derivatives ?
-    #     initialize_with_derivatives(u0, f, p, t0, q) :
-    #     initialize_without_derivatives(u0, f, p, t0, q)
-    m0, P0 = initialize_without_derivatives(u0, f, p, t0, q)
+    # # m0, P0 = initialize_derivatives ?
+    # #     initialize_with_derivatives(u0, f, p, t0, q) :
+    # #     initialize_without_derivatives(u0, f, p, t0, q)
+    # m0, P0 = initialize_without_derivatives(u0, f, p, t0, q)
 
-    m0[2] = 0.
-    P0[2, 2] = 0.001
-
-
-    P0 = 1000 * P0
-
-    @info "Cache" P0
+    # m0[2] = 0.
+    # P0[2, 2] = 0.001
 
 
-    # @assert iszero(P0)
-    P0 = SRMatrix(P0)
+    # P0 = 1000 * P0
+
+    # @info "Cache" P0
+
+
+    # # @assert iszero(P0)
+    # P0 = SRMatrix(P0)
+
+    m0 = zeros(uElType, d * (q + 1))
+    P0 = SRMatrix(uElType.(Matrix(I(d * (q + 1)))))
     x0 = Gaussian(m0, P0)
 
     # Pre-allocate a bunch of matrices
