@@ -10,32 +10,32 @@ function OrdinaryDiffEq.initialize!(integ, cache::GaussianODEFilterCache)
     @unpack f, p, dt, alg = integ
     @unpack ddu, Proj, Precond, H, u_pred = integ.cache
 
-    μ = x.μ
-    Σ = x.Σ
-    H =  Proj(0)
-    S = H * Σ * H' 
-    K = Σ * H' * inv(S)
+    # μ = x.μ
+    # Σ = x.Σ
+    # H = [1 0] * Proj(0)
+    # S = H * Σ * H' 
+    # K = Σ * H' * inv(S)
 
-    μ_new = μ + K * ([- π / 2;  -1.7334416592072082] .- H * μ)
-    Σ_new = X_A_Xt(Σ, I - K * H)
+    # μ_new = μ + K * (- π / 2 .- H * μ)
+    # Σ_new = X_A_Xt(Σ, I - K * H)
     
-    # integ.cache.x.μ[1] = - π / 2
-    # integ.cache.x.Σ.squareroot[1, 1] = 0.0
-    # @info  "" integ.cache.x.μ
-    f(du, Proj(0) * μ_new, p, t)
-    f.jac(ddu, Proj(0) * μ_new, p, t)
+    integ.cache.x.μ[1] = - π / 2
+    integ.cache.x.Σ.squareroot[1, 1] = 0.0
+    @info  "" integ.cache.x.μ
+    # f(du, Proj(0) * μ_new, p, t)
+    # f.jac(ddu, Proj(0) * μ_new, p, t)
 
-    z = Proj(1) * μ_new - du
-    H = Proj(1) - ddu * Proj(0)
+    # z = Proj(1) * μ_new - du
+    # H = Proj(1) - ddu * Proj(0)
 
-    S = H * Σ_new * H' 
-    K = Σ_new * H' * inv(S)
+    # S = H * Σ_new * H' 
+    # K = Σ_new * H' * inv(S)
 
-    μ_new2 = μ_new - K * z
-    Σ_new2 = X_A_Xt(Σ_new, I - K * H)
+    # μ_new2 = μ_new - K * z
+    # Σ_new2 = X_A_Xt(Σ_new, I - K * H)
 
     # @info "" μ_new μ_new2 Σ_new Σ_new2
-    copy!(x, Gaussian(μ_new2, Σ_new2))
+    # copy!(x, Gaussian(μ_new, Σ_new))
 
     # @info " " μ_new Σ_new
 

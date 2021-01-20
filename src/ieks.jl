@@ -5,6 +5,7 @@ mutable struct IEKS <: AbstractEK
     diffusionmodel::Symbol
     smooth::Bool
     linearize_at
+    x0
 end
 
 """
@@ -26,7 +27,7 @@ See also: [`EK0`](@ref), [`EK1`](@ref), [`solve_ieks`](@ref)
 # References:
 - F. Tronarp, S. Särkkä, and P. Hennig: **Bayesian ODE Solvers: The Maximum A Posteriori Estimate**
 """
-function IEKS(; prior=:ibm, order=1, diffusionmodel=:dynamic, linearize_at=nothing)
+function IEKS(; prior=:ibm, order=1, diffusionmodel=:dynamic, linearize_at=nothing, x0=nothing)
     if !isnothing(linearize_at)
         @assert linearize_at isa ProbODESolution
         @assert linearize_at.alg.prior == prior
@@ -34,7 +35,7 @@ function IEKS(; prior=:ibm, order=1, diffusionmodel=:dynamic, linearize_at=nothi
         @assert linearize_at.alg.diffusionmodel == diffusionmodel
         @assert linearize_at.alg.smooth == true
     end
-    return IEKS(prior, order, diffusionmodel, true, linearize_at)
+    return IEKS(prior, order, diffusionmodel, true, linearize_at, x0)
 end
 
 
@@ -51,6 +52,7 @@ function solve_ieks(prob::DiffEqBase.AbstractODEProblem, alg::IEKS, args...;
     for i in 1:iterations
         alg.linearize_at = sol
         sol = solve(prob, alg, args...; kwargs...)
+        alg.x0 = sol.x[1]
     end
     return sol
 end

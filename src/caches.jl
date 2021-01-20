@@ -90,9 +90,13 @@ function OrdinaryDiffEq.alg_cache(
     # # @assert iszero(P0)
     # P0 = SRMatrix(P0)
 
-    m0 = zeros(uElType, d * (q + 1))
-    P0 = SRMatrix(uElType.(Matrix(I(d * (q + 1)))))
-    x0 = Gaussian(m0, P0)
+    if hasfield(typeof(alg), :x0) && !isnothing(alg.x0)
+        x0 = alg.x0
+    else
+        m0 = zeros(uElType, d * (q + 1))
+        P0 = SRMatrix(uElType.(Matrix(I(d * (q + 1)))))
+        x0 = Gaussian(m0, P0)
+    end
 
     # Pre-allocate a bunch of matrices
     h = Proj(0) * x0.μ
@@ -102,7 +106,7 @@ function OrdinaryDiffEq.alg_cache(
     v, S = copy(h), copy(ddu)
     measurement = Gaussian(v, S)
     K = copy(H')
-    G = copy(Matrix(P0))
+    G = zeros(uElType, d * (q + 1), d * (q + 1))
     covmatcache = copy(G)
 
     diffusion_models = Dict(
