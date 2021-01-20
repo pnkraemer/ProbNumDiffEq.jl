@@ -46,7 +46,7 @@ ODE multiple times. `solve_ieks` therefore wraps a call to the standard `solve` 
 passing `args...` and `kwargs...`.
 """
 function solve_ieks(prob::DiffEqBase.AbstractODEProblem, alg::IEKS, args...;
-                    iterations=100, kwargs...)
+                    iterations=10, kwargs...)
     sol = nothing
     for i in 1:iterations
         alg.linearize_at = sol

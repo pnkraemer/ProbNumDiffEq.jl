@@ -12,11 +12,11 @@ function OrdinaryDiffEq.initialize!(integ, cache::GaussianODEFilterCache)
 
     μ = x.μ
     Σ = x.Σ
-    H = [1 0] * Proj(0)
+    H =  Proj(0)
     S = H * Σ * H' 
     K = Σ * H' * inv(S)
 
-    μ_new = μ + K * (- π / 2 .- H * μ)
+    μ_new = μ + K * ([- π / 2;  -1.7334416592072082] .- H * μ)
     Σ_new = X_A_Xt(Σ, I - K * H)
     
     # integ.cache.x.μ[1] = - π / 2
@@ -287,7 +287,6 @@ function H!(integ, x_pred, t)
 
     if alg isa EK1 || alg isa IEKS
         if alg isa IEKS && !isnothing(alg.linearize_at)
-            @show "happens"
             linearize_at = alg.linearize_at(t).μ
         else
             linearize_at = u_pred
